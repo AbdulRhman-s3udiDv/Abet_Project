@@ -1,0 +1,29 @@
+﻿DOCX CONTENT:
+Computer Science Outcomes
+1. Analyze a complex computing problem to apply principles of computing and other relevant disciplines to identify solutions.
+2. Design, implement, and evaluate a computing-based solution to meet a given set of computing requirements in the context of the programÆs discipline.
+3. Communicate effectively in a variety of professional contexts.
+4. Recognize professional responsibilities and make informed judgments in computing practice based on legal and ethical principles.
+5. Function effectively as a member or leader of a team engaged in activities appropriate to the programÆs discipline.
+6. Apply computer science theory and software development fundamentals to produce computing-based solutions. 
+A.I Science Outcomes
+1. Analyze a complex computing problem to apply principles of computing and other relevant disciplines to identify solutions.
+2. Design, implement, and evaluate a computing-based solution to meet a given set of computing requirements in the context of the programÆs discipline.
+3. Communicate effectively in a variety of professional contexts.
+4. Recognize professional responsibilities and make informed judgments in computing practice based on legal and ethical principles.
+5. Function effectively as a member or leader of a team engaged in activities appropriate to the programÆs discipline.
+6. Apply theory, techniques, and tools throughout the data analysis lifecycle and employ the resulting knowledge to satisfy stakeholdersÆ needs. 
+Engineering Students outcomes both CE and AIE
+1. an ability to identify, formulate, and solve complex engineering problems by applying principles of engineering, science, and mathematics.
+2. an ability to apply engineering design to produce solutions that meet specified needs with consideration of public health, safety, and welfare, as well as global, cultural, social, environmental, and economic factors.
+3. an ability to communicate effectively with a range of audiences.
+4. an ability to recognize ethical and professional responsibilities in engineering situations and make informed judgments, which must consider the impact of engineering solutions in global, economic, environmental, and societal contexts.
+5. an ability to function effectively on a team whose members together provide leadership, create a collaborative and inclusive environment, establish goals, plan tasks, and meet objectives.
+6. an ability to develop and conduct appropriate experimentation, analyze and interpret data, and use engineering judgment to draw conclusions.
+7. an ability to acquire and apply new knowledge as needed, using appropriate learning strategies
+
+--- SHEET: ALL ---
+   Unnamed: 0               Unnamed: 1   CS Unnamed: 3 Unnamed: 4 Unnamed: 5 Unnamed: 6 Unnamed: 7  AIS Unnamed: 9 Unnamed: 10 Unnamed: 11 Unnamed: 12 Unnamed: 13  CE  Unnamed: 15 Unnamed: 16 Unnamed: 17 Unnamed: 18 Unnamed: 19 Unnamed: 20  AIE Unnamed: 22 Unnamed: 23 Unnamed: 24 Unnamed: 25 Unnamed: 26 Unnamed: 27 ADDA Unnamed: 29 Unnamed: 30 Unnamed: 31 Unnamed: 32 Unnamed: 33 Unnamed: 34 CONS Unnamed: 36 Unnamed: 37 Unnamed: 38 Unnamed: 39 Unnamed: 40 Unnamed: 41  Total
+0       Code                     Name  SO1        SO2        SO3        SO4        SO5        SO6  SO1        SO2         SO3         SO4         SO5         SO6  SO1         SO2         SO3         SO4         SO5         SO6         SO7  SO1         SO2         SO3         SO4         SO5         SO6         SO7  SO1         SO2         SO3         SO4         SO5         SO6         SO7  SO1         SO2         SO3         SO4         SO5         SO6         SO7    NaN
+1     AIE111  Artificial Intelligence    1        NaN        NaN        NaN        NaN        NaN    1        NaN         NaN         NaN         NaN         NaN    1         NaN         NaN         NaN         NaN         NaN         NaN    1         NaN         NaN         NaN         NaN         NaN         NaN  NaN         NaN         NaN         NaN         NaN         NaN         NaN  NaN         NaN         NaN         NaN         NaN         NaN         NaN    4.0
+2     AIE121         Machine Learning  NaN          1          1        NaN          1        NaN  NaN          1           1         NaN           1         NaN  NaN           1           1         NaN           1         NaN         NaN  NaN           1           1         NaN           1         NaN         NaN  NaN         NaN         NaN         NaN         NaN         NaN         NaN  NaN         NaN         NaN         NaN         NaN         NaN         NaN   12.0
