@@ -1,7 +1,166 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, FileSpreadsheet, Activity, UploadCloud, FileText } from 'lucide-react';
+import { LayoutDashboard, FileSpreadsheet, Activity, UploadCloud, FileText, Bot, Send, User, Loader2, Sparkles } from 'lucide-react';
 import './index.css';
+
+// ── Chatbot component ──────────────────────────────────────────────────────────
+const N8N_WEBHOOK_URL = 'https://YOUR_N8N_WEBHOOK_URL/webhook/abet-chat'; // ← replace with your n8n URL
+
+const SUGGESTIONS = [
+  'Which courses are at risk next term?',
+  'Explain Student Outcome SO3',
+  'What is the pass rate trend for CSE251?',
+  'How does the ML model predict risk?',
+  'Which program has the most at-risk courses?',
+  'Suggest improvements for low-SO courses',
+];
+
+function ChatBot() {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      text: "Hello! I'm your ABET AI Assistant. Ask me anything about course risk, student outcomes, program health, or ABET compliance.",
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const sendMessage = async (text) => {
+    const userText = text || input.trim();
+    if (!userText || loading) return;
+    setInput('');
+
+    const userMsg = {
+      role: 'user',
+      text: userText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText, history: messages.map(m => ({ role: m.role, content: m.text })) }),
+      });
+      const data = await res.json();
+      // n8n can return { reply: "..." } or { output: "..." } or plain text
+      const reply = data.reply || data.output || data.text || data.message || (typeof data === 'string' ? data : 'I received your message but got an unexpected response format.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: reply,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `⚠️ Could not reach the n8n agent. Make sure your webhook URL is set and n8n is running.\n\n_Error: ${err.message}_`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isError: true,
+        },
+      ]);
+    }
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="chat-wrapper">
+      {/* Header */}
+      <div className="chat-header">
+        <div className="chat-header-avatar">
+          <Bot size={22} color="white" />
+        </div>
+        <div>
+          <div className="chat-header-name">ABET AI Assistant</div>
+          <div className="chat-header-status">
+            <span className="chat-status-dot" />
+            Powered by n8n + AI
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="chat-messages">
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat-bubble-row ${msg.role === 'user' ? 'user-row' : 'assistant-row'}`}>
+            {msg.role === 'assistant' && (
+              <div className="bubble-avatar assistant-avatar"><Bot size={16} /></div>
+            )}
+            <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : msg.isError ? 'error-bubble' : 'assistant-bubble'}`}>
+              <div className="bubble-text">{msg.text}</div>
+              <div className="bubble-time">{msg.time}</div>
+            </div>
+            {msg.role === 'user' && (
+              <div className="bubble-avatar user-avatar"><User size={16} /></div>
+            )}
+          </div>
+        ))}
+
+        {loading && (
+          <div className="chat-bubble-row assistant-row">
+            <div className="bubble-avatar assistant-avatar"><Bot size={16} /></div>
+            <div className="chat-bubble assistant-bubble typing-bubble">
+              <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Suggestions */}
+      {messages.length <= 1 && (
+        <div className="chat-suggestions">
+          <div className="suggestions-label"><Sparkles size={13} /> Try asking:</div>
+          <div className="suggestions-grid">
+            {SUGGESTIONS.map((s, i) => (
+              <button key={i} className="suggestion-chip" onClick={() => sendMessage(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="chat-input-row">
+        <textarea
+          className="chat-input"
+          placeholder="Ask about ABET risk, student outcomes, course trends…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          disabled={loading}
+        />
+        <button
+          className="chat-send-btn"
+          onClick={() => sendMessage()}
+          disabled={!input.trim() || loading}
+          title="Send (Enter)"
+        >
+          {loading ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -200,8 +359,12 @@ export default function App() {
           Manual Predictor
         </button>
         <button className={`nav-tab ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => setActiveTab('upload')}>
-          <UploadCloud size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/> 
+          <UploadCloud size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/>
           Batch Upload
+        </button>
+        <button className={`nav-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+          <Bot size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/>
+          AI Assistant
         </button>
       </div>
 
@@ -338,6 +501,12 @@ export default function App() {
             Upload the official End-of-Term Excel sheet. The ML Engine will map the structure, parse all courses, and return a robust PDF report of predicted risks.
           </p>
           <button className="btn-primary" style={{backgroundColor: 'var(--aiu-navy)'}}>Browse Excel File (*.xlsx)</button>
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{ animation: 'fadeIn 0.3s' }}>
+          <ChatBot />
         </div>
       )}
       </div>
