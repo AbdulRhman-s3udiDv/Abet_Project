@@ -1,0 +1,646 @@
+{
+  "name": "Intelligent RAG Query Router with Supabase Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.question }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a planning agent. Analyze the incoming question and determine if it requires complex planning or can be answered directly. You have access to a knowledge base and Supabase database schema. Output your decision in the structured format: requiresPlanning (boolean), response (string with your answer or plan), reasoning (string explaining your decision)."
+        }
+      },
+      "id": "bf0945f4-fea3-495c-8675-fb8b3e6d5221",
+      "name": "Planning Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        864,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "f7a078cd-1db0-472b-8634-751ebaa107a7",
+      "name": "Planning Agent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        624,
+        1420
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "tzxBuMpdOiqlLnGl",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"requiresPlanning\": {\n\t\t\t\"type\": \"boolean\",\n\t\t\t\"description\": \"Whether the question requires complex planning and execution agent\"\n\t\t},\n\t\t\"response\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"The answer or plan to execute\"\n\t\t},\n\t\t\"reasoning\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Explanation of the routing decision\"\n\t\t}\n\t}\n}"
+      },
+      "id": "7b1a81c3-451a-4713-919a-b6999b53760b",
+      "name": "Routing Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1168,
+        1420
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search the knowledge base for relevant information to answer questions",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "id": "560f8a48-0b61-499b-84ea-10f1b5cd8138",
+      "name": "Knowledge Base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        752,
+        1420
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "vsgAS6lyI6K43XOY",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "06575981-f4b7-480c-bf0b-a1bb4a358d18",
+      "name": "Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        832,
+        1628
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "tzxBuMpdOiqlLnGl",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Query Supabase database to understand schema and retrieve data",
+        "operation": "getAll",
+        "tableId": "documents"
+      },
+      "id": "12316d78-5cb6-4d6b-b7f6-943e14c7fa96",
+      "name": "Supabase Schema Tool",
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        1420
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "vsgAS6lyI6K43XOY",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.requiresPlanning }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    },
+                    "id": "618e60bf-5e48-4a68-8bf0-76c34f9753ad"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.requiresPlanning }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false"
+                    },
+                    "id": "a1b73406-e24a-43f0-b282-379b83134cea"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54b790be-bb3e-41b7-a337-e7e1246138e6",
+      "name": "Route Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1392,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.response }}",
+        "options": {
+          "systemMessage": "You are an execution agent. You receive plans from the planning agent and execute them using the available Supabase tools. Follow the plan carefully and return the results."
+        }
+      },
+      "id": "958d7cae-5898-4a37-ac2c-b8b1a9674255",
+      "name": "Execution Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1616,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "f83ed092-4415-430f-8385-22ebfd4693e3",
+      "name": "Execution Agent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1616,
+        1168
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "tzxBuMpdOiqlLnGl",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Execute operations on Supabase database based on the plan",
+        "operation": "getAll",
+        "tableId": "<__PLACEHOLDER_VALUE__supabase_table_name__>"
+      },
+      "id": "661eb981-cebe-426e-8e1b-ff1a59c8ed98",
+      "name": "Supabase Execution Tool",
+      "type": "n8n-nodes-base.supabaseTool",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        1184
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "vsgAS6lyI6K43XOY",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__website_endpoint__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"response\": $json.response } }}",
+        "options": {}
+      },
+      "id": "a4eda6ec-dfdd-49b7-bb52-704cde782b03",
+      "name": "Direct HTTP Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "<__PLACEHOLDER_VALUE__website_endpoint__>",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"response\": $json.output } }}",
+        "options": {}
+      },
+      "id": "f40461e1-c553-4dea-a845-6b2adca9c9c8",
+      "name": "Execution HTTP Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1968,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f5b8d3b0-cd79-47fe-8e0b-3fdde1928eeb",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        1196
+      ],
+      "id": "ffc028ea-6c47-47aa-913c-510fac30f0ed",
+      "name": "Webhook",
+      "webhookId": "f5b8d3b0-cd79-47fe-8e0b-3fdde1928eeb"
+    },
+    {
+      "parameters": {},
+      "id": "a2cc6ebc-7a1c-4cae-8420-6fa579402e26",
+      "name": "Upload Documents Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "876ef0e5-de67-4adf-aa0e-c5c256cbdd88",
+      "name": "Extract MD Content",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -464,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 200,
+        "options": {}
+      },
+      "id": "4316d491-2058-4053-832b-6ce20c48dec5",
+      "name": "Split Text into Chunks",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        1472
+      ]
+    },
+    {
+      "parameters": {
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "id": "8a64309d-8edd-4b22-97ea-9f554a256573",
+      "name": "Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        1264
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6efdf512-1071-4b33-b8ea-ad4c1fe79b1b",
+      "name": "Document Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -240,
+        1264
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "tzxBuMpdOiqlLnGl",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "documents",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "id": "682073be-f204-4479-83b0-c6cef0d929a2",
+      "name": "Insert into Knowledge Base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        1040
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "vsgAS6lyI6K43XOY",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Knowledge base ingestion\n",
+        "height": 672,
+        "width": 1056
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -784,
+        992
+      ],
+      "typeVersion": 1,
+      "id": "3685a6e0-37c9-4646-9727-ba1bd168a2fc",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# Planning Mode\n",
+        "height": 832,
+        "width": 1040,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        288,
+        992
+      ],
+      "typeVersion": 1,
+      "id": "ff0d078a-1bdb-45cf-a523-9cefb4c74d4e",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Execution Mode\n",
+        "height": 640,
+        "width": 784
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1344,
+        912
+      ],
+      "typeVersion": 1,
+      "id": "49065595-0b92-4175-8fce-dafe5f9c39f8",
+      "name": "Sticky Note2"
+    }
+  ],
+  "connections": {
+    "Planning Agent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Routing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Knowledge Base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Base": {
+      "ai_tool": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Schema Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planning Agent": {
+      "main": [
+        [
+          {
+            "node": "Route Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Decision": {
+      "main": [
+        [
+          {
+            "node": "Execution Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Direct HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution Agent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Execution Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase Execution Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Execution Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execution Agent": {
+      "main": [
+        [
+          {
+            "node": "Execution HTTP Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Documents Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract MD Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract MD Content": {
+      "main": [
+        [
+          {
+            "node": "Insert into Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Text into Chunks": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Document Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Knowledge Base",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert into Knowledge Base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
