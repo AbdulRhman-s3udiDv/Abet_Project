@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
+from typing import List
 import pandas as pd
 import io
+import math
+import httpx
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -75,25 +78,127 @@ def predict_manual_metrics(payload: CourseMetricsInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/predict/upload-excel")
-async def predict_from_excel(file: UploadFile = File(...)):
+
+# ── Allowed tables for batch upload ──────────────────────────────────────────
+ALLOWED_TABLES = ["courses", "programs", "program_courses", "term_metrics", "course_so_mappings"]
+
+@app.get("/api/upload/tables")
+def get_upload_tables():
+    """Return the list of tables the instructor is allowed to bulk-insert into."""
+    return {"tables": ALLOWED_TABLES}
+
+@app.get("/api/upload/tables/{table_name}/columns")
+async def get_table_columns(table_name: str):
     """
-    Accepts an Excel sheet representing the current semester's raw grades.
-    Note: In a real implementation, this endpoint would parse the file, 
-    calculate pass_rate, averages, and trend based on previous terms in the DB, 
-    and then call the predictor.
+    Fetch the column names (headings) of a Supabase table so the instructor
+    knows what columns the Excel sheet should contain.
     """
-    if not file.filename.endswith('.xlsx'):
-        raise HTTPException(status_code=400, detail="File must be .xlsx")
-        
-    contents = await file.read()
-    # Mocking extraction logic for demonstration
-    # df = pd.read_excel(io.BytesIO(contents))
-    
-    return {
-        "status": "success", 
-        "message": f"Parsed {file.filename} successfully. Awaiting calculation pipeline integration."
-    }
+    if table_name not in ALLOWED_TABLES:
+        raise HTTPException(status_code=400, detail=f"Table '{table_name}' is not allowed.")
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured.")
+
+    try:
+        # Fetch 1 row to discover column names from the response keys
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{url}/rest/v1/{table_name}?limit=1",
+                headers={
+                    "apikey": key,
+                    "Authorization": f"Bearer {key}",
+                    "Accept": "application/json",
+                },
+            )
+
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=resp.text)
+
+        data = resp.json()
+        if data and len(data) > 0:
+            columns = list(data[0].keys())
+        else:
+            # Fallback: use PostgREST OpenAPI definitions
+            async with httpx.AsyncClient() as client:
+                oa_resp = await client.get(
+                    f"{url}/rest/v1/",
+                    headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                )
+            if oa_resp.status_code == 200:
+                oa_data = oa_resp.json()
+                definitions = oa_data.get("definitions", {})
+                table_def = definitions.get(table_name, {})
+                columns = list(table_def.get("properties", {}).keys())
+            else:
+                columns = []
+
+        return {"table": table_name, "columns": columns}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/upload/insert")
+async def upload_excel_to_table(
+    file: UploadFile = File(...),
+    table_name: str = Form(...)
+):
+    """
+    Upload an Excel file and insert its rows into the selected Supabase table.
+    The Excel column headers must match the table column names.
+    The 'id' and 'created_at' columns are auto-generated and will be stripped.
+    """
+    if table_name not in ALLOWED_TABLES:
+        raise HTTPException(status_code=400, detail=f"Table '{table_name}' is not allowed.")
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured.")
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(status_code=400, detail="File must be .xlsx, .xls, or .csv")
+
+    try:
+        contents = await file.read()
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+
+        if df.empty:
+            raise HTTPException(status_code=400, detail="The uploaded Excel file is empty.")
+
+        # Remove auto-generated columns the user should not supply
+        for col in ['id', 'created_at']:
+            if col in df.columns:
+                df = df.drop(columns=[col])
+
+        # Replace NaN with None for JSON serialization
+        records = df.where(df.notna(), None).to_dict(orient='records')
+        clean_records = []
+        for row in records:
+            clean_row = {}
+            for k, v in row.items():
+                if isinstance(v, float) and math.isnan(v):
+                    clean_row[k] = None
+                else:
+                    clean_row[k] = v
+            clean_records.append(clean_row)
+
+        # Batch insert (Supabase limit is ~1000 rows per request)
+        inserted = 0
+        for i in range(0, len(clean_records), 500):
+            batch = clean_records[i:i+500]
+            res = supabase.table(table_name).insert(batch).execute()
+            inserted += len(res.data)
+
+        return {
+            "status": "success",
+            "message": f"Inserted {inserted} rows into '{table_name}' from {file.filename}.",
+            "inserted_count": inserted,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
 
 @app.get("/api/courses")
 def get_all_courses():

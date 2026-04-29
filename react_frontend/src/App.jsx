@@ -1,7 +1,369 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { LayoutDashboard, FileSpreadsheet, Activity, UploadCloud, FileText } from 'lucide-react';
+import { LayoutDashboard, FileSpreadsheet, Activity, UploadCloud, FileText, Bot, Send, User, Loader2, Sparkles, CheckCircle2, AlertCircle, Database, Table2 } from 'lucide-react';
 import './index.css';
+
+// ── Chatbot component ──────────────────────────────────────────────────────────
+const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook/f5b8d3b0-cd79-47fe-8e0b-3fdde1928eeb';
+
+const SUGGESTIONS = [
+  'Which courses are at risk next term?',
+  'Explain Student Outcome SO3',
+  'What is the pass rate trend for CSE251?',
+  'How does the ML model predict risk?',
+  'Which program has the most at-risk courses?',
+  'Suggest improvements for low-SO courses',
+];
+
+function ChatBot() {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      text: "Hello! I'm your ABET AI Assistant. Ask me anything about course risk, student outcomes, program health, or ABET compliance.",
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  const sendMessage = async (text) => {
+    const userText = text || input.trim();
+    if (!userText || loading) return;
+    setInput('');
+
+    const userMsg = {
+      role: 'user',
+      text: userText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText, history: messages.map(m => ({ role: m.role, content: m.text })) }),
+      });
+      const data = await res.json();
+      // n8n can return { reply: "..." } or { output: "..." } or plain text
+      const reply = data.reply || data.output || data.text || data.message || (typeof data === 'string' ? data : 'I received your message but got an unexpected response format.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: reply,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: `⚠️ Could not reach the n8n agent. Make sure your webhook URL is set and n8n is running.\n\n_Error: ${err.message}_`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isError: true,
+        },
+      ]);
+    }
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="chat-wrapper">
+      {/* Header */}
+      <div className="chat-header">
+        <div className="chat-header-avatar">
+          <Bot size={22} color="white" />
+        </div>
+        <div>
+          <div className="chat-header-name">ABET AI Assistant</div>
+          <div className="chat-header-status">
+            <span className="chat-status-dot" />
+            Powered by n8n + AI
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="chat-messages">
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat-bubble-row ${msg.role === 'user' ? 'user-row' : 'assistant-row'}`}>
+            {msg.role === 'assistant' && (
+              <div className="bubble-avatar assistant-avatar"><Bot size={16} /></div>
+            )}
+            <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : msg.isError ? 'error-bubble' : 'assistant-bubble'}`}>
+              <div className="bubble-text">{msg.text}</div>
+              <div className="bubble-time">{msg.time}</div>
+            </div>
+            {msg.role === 'user' && (
+              <div className="bubble-avatar user-avatar"><User size={16} /></div>
+            )}
+          </div>
+        ))}
+
+        {loading && (
+          <div className="chat-bubble-row assistant-row">
+            <div className="bubble-avatar assistant-avatar"><Bot size={16} /></div>
+            <div className="chat-bubble assistant-bubble typing-bubble">
+              <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Suggestions */}
+      {messages.length <= 1 && (
+        <div className="chat-suggestions">
+          <div className="suggestions-label"><Sparkles size={13} /> Try asking:</div>
+          <div className="suggestions-grid">
+            {SUGGESTIONS.map((s, i) => (
+              <button key={i} className="suggestion-chip" onClick={() => sendMessage(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Input */}
+      <div className="chat-input-row">
+        <textarea
+          className="chat-input"
+          placeholder="Ask about ABET risk, student outcomes, course trends…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          disabled={loading}
+        />
+        <button
+          className="chat-send-btn"
+          onClick={() => sendMessage()}
+          disabled={!input.trim() || loading}
+          title="Send (Enter)"
+        >
+          {loading ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Batch Upload component ──────────────────────────────────────────────────
+const API_BASE = 'http://127.0.0.1:8000';
+
+function BatchUpload() {
+  const [tables, setTables] = useState([]);
+  const [selectedTable, setSelectedTable] = useState('');
+  const [columns, setColumns] = useState([]);
+  const [loadingColumns, setLoadingColumns] = useState(false);
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // Fetch available tables on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/upload/tables`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.tables) setTables(data.tables);
+      })
+      .catch(err => console.error('Failed to load tables:', err));
+  }, []);
+
+  // Fetch columns when a table is selected
+  useEffect(() => {
+    if (!selectedTable) {
+      setColumns([]);
+      return;
+    }
+    setLoadingColumns(true);
+    setResult(null);
+    fetch(`${API_BASE}/api/upload/tables/${selectedTable}/columns`)
+      .then(res => res.json())
+      .then(data => {
+        setColumns(data.columns || []);
+      })
+      .catch(err => {
+        console.error(err);
+        setColumns([]);
+      })
+      .finally(() => setLoadingColumns(false));
+  }, [selectedTable]);
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    setFile(f || null);
+    setResult(null);
+  };
+
+  const handleUpload = async () => {
+    if (!file || !selectedTable) return;
+    setUploading(true);
+    setResult(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('table_name', selectedTable);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/upload/insert`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({ type: 'success', message: data.message, count: data.inserted_count });
+        setFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        setResult({ type: 'error', message: data.detail || 'Upload failed.' });
+      }
+    } catch (err) {
+      setResult({ type: 'error', message: 'Could not connect to the server. Is the backend running?' });
+    }
+    setUploading(false);
+  };
+
+  return (
+    <div className="glass-panel" style={{ maxWidth: '700px', margin: '0 auto' }}>
+      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+        <Database size={48} color="var(--aiu-navy)" style={{ marginBottom: '12px' }} />
+        <h2 style={{ marginBottom: '6px' }}>Batch Data Upload</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+          Select a database table, review its expected columns, then upload an Excel or CSV file to insert data.
+        </p>
+      </div>
+
+      {/* Step 1: Table Selection */}
+      <div style={{ marginBottom: '20px' }}>
+        <span className="label-text">
+          <Table2 size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }} />
+          1. Select Target Table
+        </span>
+        <select
+          className="input-field"
+          value={selectedTable}
+          onChange={(e) => { setSelectedTable(e.target.value); setFile(null); setResult(null); }}
+        >
+          <option value="">-- Choose a table --</option>
+          {tables.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Step 2: Column Headings */}
+      {selectedTable && (
+        <div className="upload-columns-section" style={{ marginBottom: '24px' }}>
+          <span className="label-text" style={{ marginBottom: '12px' }}>
+            <FileText size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }} />
+            2. Expected Columns for <strong style={{ color: 'var(--aiu-navy)' }}>{selectedTable}</strong>
+          </span>
+
+          {loadingColumns ? (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <Loader2 size={24} className="spin" color="var(--text-secondary)" />
+            </div>
+          ) : columns.length > 0 ? (
+            <div className="column-chips-container">
+              {columns.map((col, i) => (
+                <span key={i} className="column-chip">
+                  {col}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontStyle: 'italic' }}>
+              No columns found. The table may be empty and have no discoverable schema.
+            </p>
+          )}
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '10px' }}>
+            <strong>Note:</strong> Your Excel headers must match these column names. The <code>id</code> and <code>created_at</code> columns are auto-generated and will be ignored if present.
+          </p>
+        </div>
+      )}
+
+      {/* Step 3: File Upload */}
+      {selectedTable && columns.length > 0 && (
+        <div style={{ marginBottom: '20px' }}>
+          <span className="label-text">
+            <UploadCloud size={14} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }} />
+            3. Upload Excel File
+          </span>
+          <div className="upload-drop-area" onClick={() => fileInputRef.current?.click()}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+            />
+            {file ? (
+              <div>
+                <FileSpreadsheet size={32} color="var(--aiu-navy)" />
+                <p style={{ margin: '8px 0 0', fontWeight: 600, color: 'var(--text-primary)' }}>{file.name}</p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  {(file.size / 1024).toFixed(1)} KB — Click to change
+                </p>
+              </div>
+            ) : (
+              <div>
+                <UploadCloud size={36} color="var(--text-secondary)" />
+                <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)' }}>
+                  Click to browse for an Excel or CSV file
+                </p>
+              </div>
+            )}
+          </div>
+
+          <button
+            className="btn-primary"
+            style={{ width: '100%', marginTop: '14px' }}
+            disabled={!file || uploading}
+            onClick={handleUpload}
+          >
+            {uploading ? (
+              <><Loader2 size={18} className="spin" style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '6px' }} /> Uploading...</>
+            ) : (
+              <>Upload & Insert into {selectedTable}</>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Result feedback */}
+      {result && (
+        <div className={`upload-result ${result.type === 'success' ? 'upload-success' : 'upload-error'}`}>
+          {result.type === 'success' ? (
+            <CheckCircle2 size={22} style={{ flexShrink: 0 }} />
+          ) : (
+            <AlertCircle size={22} style={{ flexShrink: 0 }} />
+          )}
+          <div>
+            <strong>{result.type === 'success' ? 'Success!' : 'Error'}</strong>
+            <p style={{ margin: '4px 0 0', fontSize: '0.9rem' }}>{result.message}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -62,7 +424,7 @@ export default function App() {
     };
 
     try {
-        const res = await fetch('http://127.0.0.1:8001/predict/manual', {
+        const res = await fetch('http://127.0.0.1:8000/predict/manual', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
@@ -98,7 +460,7 @@ export default function App() {
 
   // Fetch true courses from API on load
   useEffect(() => {
-    fetch('http://127.0.0.1:8001/api/courses')
+    fetch('http://127.0.0.1:8000/api/courses')
       .then(res => res.json())
       .then(data => {
         if (data.courses && data.courses.length > 0) {
@@ -112,7 +474,7 @@ export default function App() {
   // Fetch real trend data whenever dashboard course changes
   useEffect(() => {
     if (selectedCourseId) {
-      fetch(`http://127.0.0.1:8001/api/courses/${selectedCourseId}/trend`)
+      fetch(`http://127.0.0.1:8000/api/courses/${selectedCourseId}/trend`)
         .then(res => res.json())
         .then(data => setTrendData(data))
         .catch(err => console.error(err));
@@ -121,7 +483,7 @@ export default function App() {
 
   // DB-Driven Cascade fetching for Autocomplete Prediction Form
   useEffect(() => {
-    fetch('http://127.0.0.1:8001/api/programs')
+    fetch('http://127.0.0.1:8000/api/programs')
       .then(res => res.json())
       .then(data => {
         setPrograms(data);
@@ -132,7 +494,7 @@ export default function App() {
 
   useEffect(() => {
     if (selectedProgId) {
-       fetch(`http://127.0.0.1:8001/api/programs/${selectedProgId}/courses`)
+       fetch(`http://127.0.0.1:8000/api/programs/${selectedProgId}/courses`)
          .then(res=>res.json())
          .then(data => {
             setProgCourses(data);
@@ -144,7 +506,7 @@ export default function App() {
 
   useEffect(() => {
      if (selectedPredictCourseId) {
-        fetch(`http://127.0.0.1:8001/api/courses/${selectedPredictCourseId}/terms`)
+        fetch(`http://127.0.0.1:8000/api/courses/${selectedPredictCourseId}/terms`)
           .then(res => res.json())
           .then(data => {
               setCourseTerms(data);
@@ -200,8 +562,12 @@ export default function App() {
           Manual Predictor
         </button>
         <button className={`nav-tab ${activeTab === 'upload' ? 'active' : ''}`} onClick={() => setActiveTab('upload')}>
-          <UploadCloud size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/> 
+          <UploadCloud size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/>
           Batch Upload
+        </button>
+        <button className={`nav-tab ${activeTab === 'chat' ? 'active' : ''}`} onClick={() => setActiveTab('chat')}>
+          <Bot size={18} style={{display:'inline', verticalAlign:'text-bottom', marginRight:'6px'}}/>
+          AI Assistant
         </button>
       </div>
 
@@ -331,13 +697,14 @@ export default function App() {
       )}
 
       {activeTab === 'upload' && (
-        <div className="glass-panel" style={{ animation: 'fadeIn 0.3s', textAlign: 'center', padding: '60px 20px' }}>
-          <FileSpreadsheet size={64} color="#64748b" style={{marginBottom: '20px'}} />
-          <h2 style={{marginBottom: '10px'}}>Batch Evaluation via Excel</h2>
-          <p style={{color: 'var(--text-secondary)', marginBottom: '30px'}}>
-            Upload the official End-of-Term Excel sheet. The ML Engine will map the structure, parse all courses, and return a robust PDF report of predicted risks.
-          </p>
-          <button className="btn-primary" style={{backgroundColor: 'var(--aiu-navy)'}}>Browse Excel File (*.xlsx)</button>
+        <div style={{ animation: 'fadeIn 0.3s' }}>
+          <BatchUpload />
+        </div>
+      )}
+
+      {activeTab === 'chat' && (
+        <div style={{ animation: 'fadeIn 0.3s' }}>
+          <ChatBot />
         </div>
       )}
       </div>
