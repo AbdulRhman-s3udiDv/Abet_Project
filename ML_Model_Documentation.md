@@ -11,6 +11,12 @@ According to standard ABET Quality Assurance KPIs, a course is flagged as mathem
 
 The AI Model's job is to analyze current semester data to evaluate whether the course will breach any of these rules in the **subsequent** semester.
 
+### Data Annotation & Rule-Based Labeling Process
+Rather than relying on error-prone or subjective manual classification, the dataset training the model was annotated using an automated **Rule-Based Labeling** algorithm to establish the objective Ground Truth.
+- **Automated Evaluation:** A preprocessing script iterated through all historical semester data.
+- **Label Assignment:** For each course in a given Term $N$, the algorithm evaluated its performance in the future Term $N+1$. If **any** of the three failure conditions mentioned above were met in Term $N+1$, the course data for Term $N$ was automatically assigned `Label = 1` (At Risk). If none of the conditions were met, it received `Label = 0` (Safe).
+- **The Learning Objective:** By systematically assigning labels this way, we "taught" the machine learning model to associate current semester characteristics with future accreditation risks, enabling it to detect complex early-warning signs before they actually breach ABET KPI thresholds.
+
 ## 2. Program-Specific SO Matrices (Handling Sparse Data)
 ABET programs (e.g., Computer Science vs. Engineering) have different numbers of Student Outcomes (6 vs 7). Furthermore, individual courses do not map to every SO. 
 For example, course `AIE111` may only cover `SO1`, leaving `SO2` through `SO7` completely unassessed.
